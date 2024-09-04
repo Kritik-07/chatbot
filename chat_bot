@@ -1,0 +1,72 @@
+import sqlite3
+import nltk
+import re
+from chatterbot import ChatBot
+from chatterbot.trainers import ListTrainer
+import spacy
+
+# Ensure necessary NLTK data is downloaded
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+
+# Load spaCy model
+nlp = spacy.load("en_core_web_sm")
+
+# Process a sentence with spaCy
+# doc = nlp("This is a sentence.")
+# print([(w.text, w.pos_) for w in doc])
+# Connect to SQLite database (or create it if it doesn't exist)
+conn = sqlite3.connect('chatbot_database.sqlite3')
+cursor = conn.cursor()
+
+# Create a table for storing conversations if it doesn't exist
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_input TEXT NOT NULL,
+    bot_response TEXT NOT NULL
+)
+''')
+conn.commit()
+
+# Function to save conversation to the database
+def save_conversation(user_input, bot_response):
+    cursor.execute('''
+    INSERT INTO conversations (user_input, bot_response)
+    VALUES (?, ?)
+    ''', (user_input, bot_response))
+    conn.commit()
+
+# Create and train a chatbot
+chatbot = ChatBot(
+    "Ron Obvious",
+    storage_adapter='chatterbot.storage.SQLStorageAdapter',
+    database_uri='sqlite:///database.sqlite3'
+)
+conversation = [
+    "Hello",
+    "Hi there!",
+    "How are you doing?",
+    "How are you",
+    "I'm doing great.",
+    "That is good to hear",
+    "Thank you.",
+    "You're welcome."
+]
+trainer = ListTrainer(chatbot, show_training_progress=True)
+while True:
+        user_input = input("Text: ").strip()
+        if user_input in ['quit', 'bye','exit']:
+                print("Bye goodbye")
+                break
+        
+        response = chatbot.get_response(user_input)
+        print("Bot:",response)
+        feedback = input("Was this response helpful? (yes/no): ").strip().lower()
+        if feedback =="yes":
+            trainer.train([user_input,str(response)])
+        elif feedback == "no":
+            correct_response = input("What would have been a better response? ")
+            trainer.train([user_input,str(correct_response)])
+        elif feedback =="":
+            break
